@@ -45,6 +45,9 @@ services:
     environment:
       DATABASE_URL: postgresql://gateway_user:gateway_pass@postgres:5432/payment_gateway
       REDIS_URL: redis://redis:6379
+      TEST_MODE: "true"
+      TEST_PROCESSING_DELAY: "1000"
+      TEST_PAYMENT_SUCCESS: "true"
     depends_on:
       postgres:
         condition: service_healthy
