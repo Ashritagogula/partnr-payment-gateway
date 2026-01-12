@@ -1,4 +1,5 @@
 const paymentQueue = require('../queues/payment.queue');
+const webhookQueue = require('../queues/webhook.queue');
 const {
   TEST_MODE,
   TEST_PROCESSING_DELAY,
@@ -13,7 +14,7 @@ paymentQueue.process(async (job) => {
 
   console.log(`🔄 Processing payment ${paymentId}`);
 
-  // ⏳ Simulated delay
+  // ⏳ Simulated processing delay
   if (TEST_MODE) {
     await new Promise(r => setTimeout(r, TEST_PROCESSING_DELAY));
   } else {
@@ -26,11 +27,30 @@ paymentQueue.process(async (job) => {
     ? TEST_PAYMENT_SUCCESS
     : decidePaymentOutcome(method);
 
+  const event = success ? 'payment.success' : 'payment.failed';
+
   if (success) {
     console.log(`✅ Payment SUCCESS: ${paymentId}`);
   } else {
     console.log(`❌ Payment FAILED: ${paymentId}`);
   }
+
+  // 📡 Enqueue webhook delivery job
+  await webhookQueue.add({
+    url: 'http://host.docker.internal:4000/webhook',
+    secret: 'whsec_test_abc123',
+    payload: {
+      event,
+      timestamp: Math.floor(Date.now() / 1000),
+      data: {
+        payment: {
+          id: paymentId,
+          method,
+          status: success ? 'success' : 'failed'
+        }
+      }
+    }
+  });
 
   return { paymentId, success };
 });
