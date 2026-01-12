@@ -1,9 +1,13 @@
 const paymentQueue = require('../queues/payment.queue');
 
-console.log(' Payment worker started');
+console.log('👷 Payment worker started');
 
 paymentQueue.process(async (job) => {
-  console.log(' Processing job:', job.id);
-  await new Promise(r => setTimeout(r, 2000));
-  console.log(' Job done:', job.id);
+  const { paymentId, method } = job.data;
+
+  console.log(`Processing payment ${paymentId} (${method})`);
+
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  console.log(`Payment ${paymentId} processed`);
 });
