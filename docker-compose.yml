@@ -1,8 +1,6 @@
-
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: postgres_gateway
     environment:
       POSTGRES_DB: payment_gateway
       POSTGRES_USER: gateway_user
@@ -17,7 +15,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: redis_gateway
     ports:
       - "6379:6379"
     healthcheck:
@@ -30,7 +27,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: gateway_api
     environment:
       DATABASE_URL: postgresql://gateway_user:gateway_pass@postgres:5432/payment_gateway
       REDIS_URL: redis://redis:6379
@@ -46,7 +42,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.worker
-    container_name: gateway_worker
     environment:
       DATABASE_URL: postgresql://gateway_user:gateway_pass@postgres:5432/payment_gateway
       REDIS_URL: redis://redis:6379
