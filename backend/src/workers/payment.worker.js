@@ -1,5 +1,6 @@
 const paymentQueue = require('../queues/payment.queue');
 const webhookQueue = require('../queues/webhook.queue');
+const pool = require('../config/db');
 const {
   TEST_MODE,
   TEST_PROCESSING_DELAY,
@@ -14,12 +15,12 @@ paymentQueue.process(async (job) => {
 
   console.log(`🔄 Processing payment ${paymentId}`);
 
-  // ⏳ Simulated processing delay
+  // ⏳ Simulated delay
   if (TEST_MODE) {
-    await new Promise(r => setTimeout(r, TEST_PROCESSING_DELAY));
+    await new Promise((r) => setTimeout(r, TEST_PROCESSING_DELAY));
   } else {
     const delay = 5000 + Math.floor(Math.random() * 5000);
-    await new Promise(r => setTimeout(r, delay));
+    await new Promise((r) => setTimeout(r, delay));
   }
 
   // ✅ Decide success / failure
@@ -29,27 +30,64 @@ paymentQueue.process(async (job) => {
 
   const event = success ? 'payment.success' : 'payment.failed';
 
-  if (success) {
-    console.log(`✅ Payment SUCCESS: ${paymentId}`);
-  } else {
-    console.log(`❌ Payment FAILED: ${paymentId}`);
+  console.log(
+    success
+      ? `✅ Payment SUCCESS: ${paymentId}`
+      : `❌ Payment FAILED: ${paymentId}`
+  );
+
+  // 🔍 Fetch payment + merchant info
+  const { rows } = await pool.query(
+    `SELECT p.id, p.amount, p.currency, p.method, p.created_at,
+            m.id AS merchant_id, m.webhook_url, m.webhook_secret
+     FROM payments p
+     JOIN merchants m ON p.merchant_id = m.id
+     WHERE p.id = $1`,
+    [paymentId]
+  );
+
+  if (!rows.length || !rows[0].webhook_url) {
+    console.log('⚠️ No webhook configured, skipping delivery');
+    return { paymentId, success };
   }
 
-  // 📡 Enqueue webhook delivery job
-  await webhookQueue.add({
-    url: 'http://host.docker.internal:4000/webhook',
-    secret: 'whsec_test_abc123',
-    payload: {
-      event,
-      timestamp: Math.floor(Date.now() / 1000),
-      data: {
-        payment: {
-          id: paymentId,
-          method,
-          status: success ? 'success' : 'failed'
-        }
+  const merchant = rows[0];
+
+  // 📦 Webhook payload (task format)
+  const payload = {
+    event,
+    timestamp: Math.floor(Date.now() / 1000),
+    data: {
+      payment: {
+        id: paymentId,
+        amount: merchant.amount,
+        currency: merchant.currency,
+        method: merchant.method,
+        status: success ? 'success' : 'failed',
+        created_at: merchant.created_at
       }
     }
+  };
+
+  // 📝 Create webhook log entry
+  const logResult = await pool.query(
+    `INSERT INTO webhook_logs
+      (merchant_id, event, payload, status, attempts, created_at)
+     VALUES ($1, $2, $3, 'pending', 0, NOW())
+     RETURNING id`,
+    [merchant.merchant_id, event, payload]
+  );
+
+  const webhookLogId = logResult.rows[0].id;
+
+  // 📡 Enqueue webhook job
+  await webhookQueue.add({
+    webhookLogId,
+    webhookUrl: merchant.webhook_url,
+    webhookSecret: merchant.webhook_secret,
+    payload,
+    event,
+    attempt: 0
   });
 
   return { paymentId, success };
