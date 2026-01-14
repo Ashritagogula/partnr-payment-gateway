@@ -1,4 +1,5 @@
 const app = require('./app');
+require('./workers/refund.worker');
 
 const PORT = 8000;
 
