@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Webhook Configuration</title>
+  <style>
+    body { font-family: Arial; background:#f6f7fb; padding:20px }
+    h2,h3 { margin-top:20px }
+    label { display:block; margin-top:10px }
+    input { padding:6px; width:400px }
+    button { margin-top:10px; padding:6px 12px; cursor:pointer }
+    table { width:100%; margin-top:20px; border-collapse:collapse; background:#fff }
+    th,td { border:1px solid #ddd; padding:8px }
+    th { background:#eee }
+  </style>
+</head>
+<body>
+
+<div data-test-id="webhook-config">
+
+  <h2>Webhook Configuration</h2>
+
+  <form data-test-id="webhook-config-form" onsubmit="saveConfig(event)">
+    <label>Webhook URL</label>
+    <input data-test-id="webhook-url-input" id="url" type="url"
+      placeholder="https://yoursite.com/webhook" />
+
+    <label>Webhook Secret</label>
+    <span data-test-id="webhook-secret" id="secret">whsec_test_abc123</span>
+    <br/>
+    <button type="button" data-test-id="regenerate-secret-button"
+      onclick="regenerateSecret()">Regenerate</button>
+
+    <br/>
+    <button data-test-id="save-webhook-button" type="submit">
+      Save Configuration
+    </button>
+
+    <button type="button" data-test-id="test-webhook-button"
+      onclick="sendTestWebhook()">
+      Send Test Webhook
+    </button>
+  </form>
+
+  <h3>Webhook Logs</h3>
+
+  <table data-test-id="webhook-logs-table">
+    <thead>
+      <tr>
+        <th>Event</th>
+        <th>Status</th>
+        <th>Attempts</th>
+        <th>Last Attempt</th>
+        <th>Response Code</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="logs"></tbody>
+  </table>
+
+</div>
+
+<script>
+const API = "http://localhost:8000/api";
+
+async function loadLogs() {
+  const res = await fetch(API + "/webhooks/logs");
+  const data = await res.json();
+  const tbody = document.getElementById("logs");
+  tbody.innerHTML = "";
+
+  data.forEach(l => {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-test-id","webhook-log-item");
+    tr.setAttribute("data-webhook-id",l.id);
+    tr.innerHTML = `
+      <td data-test-id="webhook-event">${l.event}</td>
+      <td data-test-id="webhook-status">${l.status}</td>
+      <td data-test-id="webhook-attempts">${l.attempts}</td>
+      <td data-test-id="webhook-last-attempt">${l.last_attempt}</td>
+      <td data-test-id="webhook-response-code">${l.response_code || "-"}</td>
+      <td>
+        <button data-test-id="retry-webhook-button"
+          onclick="retry('${l.id}')">Retry</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function retry(id){
+  await fetch(API + "/webhooks/retry/" + id,{method:"POST"});
+  alert("Retry triggered");
+  loadLogs();
+}
+
+function regenerateSecret(){
+  document.getElementById("secret").innerText =
+    "whsec_" + Math.random().toString(36).slice(2);
+}
+
+async function saveConfig(e){
+  e.preventDefault();
+  await fetch(API + "/webhooks/config",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      webhook_url: document.getElementById("url").value
+    })
+  });
+  alert("Saved");
+}
+
+async function sendTestWebhook(){
+  await fetch(API + "/webhooks/test",{method:"POST"});
+  alert("Test webhook sent");
+}
+
+loadLogs();
+</script>
+
+</body>
+</html>
