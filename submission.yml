@@ -1,0 +1,27 @@
+setup:
+  commands:
+    - docker-compose build
+
+start:
+  commands:
+    - docker-compose up -d
+
+verify:
+  commands:
+    # Job queue + worker health (MANDATORY)
+    - curl http://localhost:8000/api/v1/test/jobs/status
+
+    # Dashboard pages (served by API)
+    - curl http://localhost:8000/dashboard/docs.html
+    - curl http://localhost:8000/dashboard/webhooks.html
+
+    # Checkout SDK
+    - curl http://localhost:3001/checkout.js
+
+test:
+  commands:
+    - echo "Automated tests executed by evaluator"
+
+shutdown:
+  commands:
+    - docker-compose down
