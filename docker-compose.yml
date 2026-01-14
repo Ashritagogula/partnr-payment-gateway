@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -7,8 +9,10 @@ services:
       POSTGRES_PASSWORD: gateway_pass
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gateway_user"]
+      test: ["CMD-SHELL", "pg_isready -U gateway_user -d payment_gateway"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,13 +29,16 @@ services:
 
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://gateway_user:gateway_pass@postgres:5432/payment_gateway
       REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
+    volumes:
+      # 🔥 MOUNT SDK BUILD INTO BACKEND CONTAINER
+      - ./checkout-widget/dist:/app/checkout-widget/dist:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,8 +47,8 @@ services:
 
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.worker
+      context: .
+      dockerfile: backend/Dockerfile.worker
     environment:
       DATABASE_URL: postgresql://gateway_user:gateway_pass@postgres:5432/payment_gateway
       REDIS_URL: redis://redis:6379
@@ -55,3 +62,6 @@ services:
         condition: service_healthy
       api:
         condition: service_started
+
+volumes:
+  postgres_data:
