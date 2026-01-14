@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Partnr Checkout SDK Test</title>
+</head>
+<body>
+
+  <h2>Partnr Checkout SDK Test</h2>
+
+  <button id="payBtn">Pay Now</button>
+
+  <script src="/checkout.js"></script>
+
+  <script>
+    document.getElementById('payBtn').addEventListener('click', function () {
+      PartnrCheckout.open({
+        order_id: "order_test_123",
+        amount: 50000,
+        currency: "INR",
+        method: "upi",
+        vpa: "user@paytm"
+      });
+    });
+  </script>
+
+</body>
+</html>
